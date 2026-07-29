@@ -1,0 +1,336 @@
+---
+// CONSOLE, ON SCROLL. The recorded console session pins to the viewport and
+// scroll drives its size: it zooms in until it holds the whole screen, plays
+// the run there, and zooms back out when the reader scrolls on. While it is
+// pinned the page underneath stays put; scrolling only advances the zoom.
+//
+// The wheel leaves fullscreen from surface that has nothing of its own to
+// scroll. Over the transcript or the trace list it scrolls those, and the
+// demo build contains its inner scrollports (workers/console demo main.tsx),
+// so bottoming one out never throws the reader off the console.
+//
+// The zoom is a CSS scroll-driven animation. The timeline lives on the tall
+// track, never on the sticky stage: a pinned element holds one viewport
+// position, so its own view() progress would freeze exactly while pinned.
+---
+
+<section
+  class="ccon"
+  id="console-live"
+  aria-label="The same run, inside the console"
+>
+  <header class="xp-head">
+    <h2 class="xp-title">
+      <span class="accent">same run.</span>
+      <span class="mute"
+        ><b style="color:var(--ink); font-weight:500">from inside the harness.</b
+        ><br />your agentic harness is part of your system. so it can move faster, better, and with less tokens than any other harness.</span
+      >
+    </h2>
+  </header>
+
+  <div class="ccon-track" data-ccon-track>
+    <div class="ccon-stage" data-ccon-stage>
+      <div class="ccon-frame">
+        <iframe
+          title="iii console replaying a payments ledger session"
+          loading="lazy"
+          data-ccon-iframe
+          data-src="/console-demo/index.html"></iframe>
+        <button
+          type="button"
+          class="ccon-cover"
+          data-ccon-cover
+          aria-label="interact with the console"
+        >
+          <span class="ccon-cover-hint">click to interact</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style is:global>
+  /* The id outranks `.sheet > *{z-index:1}` in landing.css; the z-index
+     itself is animated below, so the raised value only holds mid-zoom. */
+  #console-live.ccon {
+    position: relative;
+    padding: 0 0 96px;
+    timeline-scope: --ccon-track;
+  }
+  .ccon-stage {
+    height: 100vh;
+    height: 100dvh;
+    /* Full-bleed: the page column sits right of the scroll rail, so centering
+       inside it pulls the frame off viewport center. */
+    margin-inline: calc(50% - 50vw);
+    display: grid;
+    place-items: center;
+    /* The stage covers the viewport while pinned; hit-testing passes through
+       everything except the frame, so the nav stays clickable around it. */
+    pointer-events: none;
+  }
+  .ccon-frame {
+    position: relative;
+    /* Wider than this and the console's columns stretch past the width they
+       were designed at. */
+    width: min(1800px, 100vw - 24px);
+    height: calc(100vh - 24px);
+    height: calc(100dvh - 24px);
+    pointer-events: auto;
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    box-shadow: 0 40px 120px rgba(0, 0, 0, 0.35);
+  }
+  .ccon-frame iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  /* Until the reader claims the console with a click, scroll keeps belonging
+     to the page: the cover is a plain button, so a wheel over it chains
+     straight out to the document and the zoom keeps tracking the scroll.
+     A pointer that happens to rest over the transcript is an accident of
+     position; the click is the signal of intent. */
+  /* Explicit: display:grid would otherwise override the UA's [hidden] rule
+     and the "claimed" cover would keep eating the wheel. */
+  .ccon-cover[hidden] {
+    display: none;
+  }
+  .ccon-cover {
+    position: absolute;
+    /* The window chrome bar stays exposed: its close button (inside the
+       demo, next to the recorded dot) works on the first click, before the
+       console is claimed. Nothing up there scrolls, so the wheel still
+       chains out to the page. */
+    inset: 45px 0 0 0;
+    display: grid;
+    place-items: end center;
+    padding: 0 0 18px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+  .ccon-cover-hint {
+    display: inline-block;
+    padding: 6px 12px;
+    border: 1px solid var(--rule);
+    background: var(--bg);
+    color: var(--mute);
+    font-family: var(--mono, ui-monospace, monospace);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    /* Visible by default: without scroll timelines (stable Firefox, reduced
+       motion) the cover would otherwise be an invisible click-trap. In
+       supported browsers the fill-both animation below governs instead. */
+    opacity: 1;
+    visibility: visible;
+  }
+
+  @supports (animation-timeline: view()) {
+    .ccon-track {
+      /* 220vh of scrub while pinned: ~60vh zooming in, ~115vh held at full
+         screen, ~45vh zooming out. */
+      height: 320vh;
+      view-timeline-name: --ccon-track;
+      /* The frame renders at 0.62 scale at rest but its layout box is the
+         full viewport, so (100dvh - (100dvh - 24px) * 0.62) / 2, i.e.
+         19dvh + 7.4px, of the stage is visually empty on each side. Pull
+         the track in by exactly that, so title-to-console and
+         console-to-next-section read like every other section. */
+      margin-block: calc(-19dvh - 7px);
+    }
+    .ccon-stage {
+      position: sticky;
+      top: 0;
+    }
+    .ccon-frame {
+      /* The shorthand resets animation-timeline; keep it declared first. */
+      animation: ccon-zoom linear both;
+      animation-timeline: --ccon-track;
+      animation-range: contain 0% contain 100%;
+    }
+    /* Fullscreen has to cover the sticky nav (z 50) and the cookie bar
+       (10050); the small frame scrolling past has to stay under the nav.
+       The section's z-index rides the same timeline and is only raised
+       while the frame is big enough to clear the nav band. */
+    #console-live.ccon {
+      animation: ccon-raise linear both;
+      animation-timeline: --ccon-track;
+      animation-range: contain 0% contain 100%;
+    }
+    .ccon-cover-hint {
+      animation: ccon-hint-fade linear both;
+      animation-timeline: --ccon-track;
+      animation-range: contain 0% contain 100%;
+    }
+  }
+  @keyframes ccon-hint-fade {
+    0%,
+    18% {
+      opacity: 0;
+      visibility: hidden;
+    }
+    26%,
+    84% {
+      opacity: 1;
+      visibility: visible;
+    }
+    92%,
+    100% {
+      opacity: 0;
+      visibility: hidden;
+    }
+  }
+  @keyframes ccon-zoom {
+    0% {
+      transform: scale(0.62);
+    }
+    28% {
+      transform: scale(1);
+    }
+    80% {
+      transform: scale(1);
+    }
+    100% {
+      transform: scale(0.62);
+    }
+  }
+  @keyframes ccon-raise {
+    0%,
+    6% {
+      z-index: 1;
+    }
+    12%,
+    92% {
+      z-index: 10100;
+    }
+    98%,
+    100% {
+      z-index: 1;
+    }
+  }
+  /* Reduced motion: the plain in-flow console, full size, no pin, no zoom. */
+  @media (prefers-reduced-motion: reduce) {
+    .ccon-track {
+      height: auto;
+      view-timeline-name: none;
+      /* Full-size frame here: there is no scale gap to compensate. */
+      margin-block: 0;
+    }
+    .ccon-stage {
+      position: static;
+    }
+    .ccon-frame,
+    #console-live.ccon {
+      animation: none;
+    }
+  }
+  @media (max-width: 720px) {
+    .ccon-frame {
+      width: calc(100vw - 16px);
+    }
+  }
+</style>
+
+<script>
+  (function () {
+    const track = document.querySelector('[data-ccon-track]')
+    const iframe = document.querySelector(
+      '[data-ccon-iframe]',
+    ) as HTMLIFrameElement | null
+    if (!track || !iframe) return
+
+    const currentTheme = () =>
+      document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
+
+    // First click claims the console; from then on the wheel belongs to its
+    // inner scrollers. The cover comes back once the reader has moved on, so
+    // the next approach starts hands-off again.
+    const cover = document.querySelector<HTMLElement>('[data-ccon-cover]')
+    cover?.addEventListener('click', () => {
+      cover.hidden = true
+    })
+
+    // "close" rides the scroll to the end of the track: the zoom-out plays
+    // and the reader lands where scrolling past would have put them anyway.
+    // The button lives in the demo's own window chrome and posts
+    // iii-demo-close; Escape does the same from either document.
+    const pinned = () => {
+      const r = track.getBoundingClientRect()
+      return r.top <= 0 && r.bottom >= window.innerHeight
+    }
+    const closeOut = () => {
+      const r = track.getBoundingClientRect()
+      window.scrollTo({
+        top: r.bottom + window.scrollY - window.innerHeight,
+        behavior: 'smooth',
+      })
+      if (cover) cover.hidden = false
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && pinned()) closeOut()
+    })
+    window.addEventListener('message', (e) => {
+      if (e.source !== iframe.contentWindow) return
+      if (e.data?.type === 'iii-demo-close' && pinned()) closeOut()
+    })
+
+    // Load a viewport ahead (mounted paused), so the console is ready
+    // without the session having started while still off screen.
+    new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && !iframe.getAttribute('src')) {
+            iframe.setAttribute(
+              'src',
+              `${iframe.dataset.src}?theme=${currentTheme()}&paused=1`,
+            )
+          }
+        }
+      },
+      { rootMargin: '100% 0px' },
+    ).observe(track)
+
+    // Play only while the stage owns the viewport: the stage is viewport
+    // sized, so fully visible means pinned, with the console centered. The
+    // session starts there, pauses when the reader moves on, and resumes
+    // if they come back. shouldPlay is re-sent on iframe load for readers
+    // who arrive mid-track (reload, deep link).
+    const stage = document.querySelector('[data-ccon-stage]')!
+    let shouldPlay = false
+    const syncPlay = () =>
+      iframe.contentWindow?.postMessage(
+        { type: 'iii-demo', active: shouldPlay },
+        '*',
+      )
+    iframe.addEventListener('load', syncPlay)
+    new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          /* 0.9, not ~1: phone browsers resize the viewport against the
+             100dvh stage as their chrome collapses, and the ratio never
+             sustains 0.99 — the session would stall or keep restarting. */
+          shouldPlay = entry.intersectionRatio >= 0.9
+          syncPlay()
+          if (!entry.isIntersecting && cover) cover.hidden = false
+        }
+      },
+      { threshold: [0, 0.9] },
+    ).observe(stage)
+
+    // The nav's theme button writes data-theme on <html>; the demo reads the
+    // theme once at load, so carry later flips into the frame.
+    new MutationObserver(() => {
+      iframe.contentWindow?.postMessage(
+        { type: 'iii-demo-theme', theme: currentTheme() },
+        '*',
+      )
+    }).observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    })
+  })()
+</script>
