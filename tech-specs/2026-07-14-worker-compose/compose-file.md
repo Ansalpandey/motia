@@ -7,7 +7,7 @@ whole lifetime; the daemon's `--id` is how remote control addresses it
 ## Canonical shape
 
 ```yaml
-name: orders
+namespace: orders
 
 containers:
   database:
@@ -38,7 +38,7 @@ containers:
 | `worker` | yes | `package://` (registry) or `path://` (local directory) |
 | `version` | package only | exact or range, resolved into the lockfile |
 | `depends_on` | no | container ids **from the same file only** |
-| `config_name` / `config_uri` | no | where the daemon fetches base config (see configuration.md) |
+| `config_name` | no | the configuration entry this container owns (see configuration.md) |
 | `config_override` | no | sparse map merged over the fetched base |
 | `scripts` | no (`run` required for manifest-less `path://`) | see scripts.md |
 | `working_dir` | no | default: worker dir for `path://`, compose-file dir for `package://` |
@@ -47,9 +47,10 @@ containers:
 
 - `containers` is an **id-keyed object**; the key is the worker's lifecycle id
   and its registered name.
-- For `path://` with a manifest, the key must equal the manifest `name`. For
-  manifest-less `path://` (compose declares `run`), the key **is** the
-  identity.
+- The key is the identity, always. It reaches the child as `III_WORKER_NAME`,
+  so a `path://` worker whose manifest declares a different `name` registers
+  under the key: where the two files say the same thing, `worker-compose.yaml`
+  wins and the manifest is the default.
 - No key order semantics: start order comes only from the `depends_on` DAG.
 
 ## Dependency scope
@@ -66,8 +67,7 @@ decidable by one daemon looking at one file.
   prints the full path: `api -> queue -> database -> api`);
 - unknown field anywhere (strict schema);
 - `run` on a `package://` worker; `pre_start_timeout` without `pre_start`;
-- `path://` with neither manifest nor `run`;
-- key ≠ manifest `name` when a manifest exists.
+- `path://` with neither manifest nor `run`.
 
 `iii compose validate` runs the whole ruleset offline — no engine required.
 
